@@ -5,23 +5,33 @@
 
 using namespace std;
 
-struct Event {
+class Node {
+public:
     string name;
     string date;
     string note;
-    Event* next;
+    Node* next;
+
+    // Constructor
+    Node(string name, string date, string note) {
+        this->name = name;
+        this->date = date;
+        this->note = note;
+        this->next = NULL;
+    }
 };
 
 class EventReminder {
 private:
-    Event* head;
+    Node* head;
+    Node* tail;
 
 public:
-    EventReminder() : head(nullptr) {}
+    EventReminder() : head(nullptr), tail(nullptr) {}
 
     ~EventReminder() {
         while (head) {
-            Event* temp = head;
+            Node* temp = head;
             head = head->next;
             delete temp;
         }
@@ -46,12 +56,65 @@ public:
 
     // Checks if event name already exists
     bool eventExists(const string& name) {
-        Event* current = head;
+        Node* current = head;
         while (current) {
             if (current->name == name) return true;
             current = current->next;
         }
         return false;
+    }
+
+    // Helper function to insert at head
+    void insertAtHead(Node* &head, Node* &tail, string name, string date, string note) {
+        Node* newNode = new Node(name, date, note);
+        if (head == NULL) {
+            head = newNode;
+            tail = newNode;
+            return;
+        }
+        newNode->next = head;
+        head = newNode;
+    }
+
+    // Helper function to insert at end
+    void insertAtEnd(Node* &head, Node* &tail, string name, string date, string note) {
+        Node* newNode = new Node(name, date, note);
+        if (head == NULL) {
+            head = newNode;
+            tail = newNode;
+            return;
+        }
+        tail->next = newNode;
+        tail = newNode;
+    }
+
+    // Helper function to insert in chronological order
+    void insertInOrder(Node* &head, Node* &tail, string name, string date, string note) {
+        Node* newNode = new Node(name, date, note);
+        
+        // If list is empty or new date is earlier than head
+        if (head == NULL || date < head->date) {
+            insertAtHead(head, tail, name, date, note);
+            delete newNode; // Delete the extra node we created
+            return;
+        }
+        
+        Node* temp = head;
+        // Find the correct position
+        while (temp->next != NULL && temp->next->date < date) {
+            temp = temp->next;
+        }
+        
+        // If we're at the end
+        if (temp->next == NULL) {
+            insertAtEnd(head, tail, name, date, note);
+            delete newNode; // Delete the extra node we created
+            return;
+        }
+        
+        // Insert in middle
+        newNode->next = temp->next;
+        temp->next = newNode;
     }
 
     // Adds event in chronological order
@@ -79,20 +142,7 @@ public:
         cout << "Enter note (optional): ";
         getline(cin, note);
         
-        Event* newEvent = new Event{name, date, note, nullptr};
-        
-        if (!head || date < head->date) {
-            newEvent->next = head;
-            head = newEvent;
-        } else {
-            Event* current = head;
-            while (current->next && current->next->date < date) {
-                current = current->next;
-            }
-            newEvent->next = current->next;
-            current->next = newEvent;
-        }
-        
+        insertInOrder(head, tail, name, date, note);
         cout << "Event added successfully!\n";
     }
 
@@ -110,21 +160,27 @@ public:
         getline(cin, name);
         
         if (head->name == name) {
-            Event* temp = head;
+            Node* temp = head;
             head = head->next;
+            if (head == NULL) { // If list becomes empty
+                tail = NULL;
+            }
             delete temp;
             cout << "Event removed successfully!\n";
             return;
         }
         
-        Event* current = head;
+        Node* current = head;
         while (current->next && current->next->name != name) {
             current = current->next;
         }
         
         if (current->next) {
-            Event* temp = current->next;
+            Node* temp = current->next;
             current->next = current->next->next;
+            if (temp == tail) { // If we're deleting the tail
+                tail = current;
+            }
             delete temp;
             cout << "Event removed successfully!\n";
         } else {
@@ -140,7 +196,7 @@ public:
             return;
         }
         
-        Event* current = head;
+        Node* current = head;
         int count = 1;
         while (current) {
             cout << count++ << ". " << current->name << "\n";
@@ -166,7 +222,7 @@ public:
         cin.ignore();
         getline(cin, name);
         
-        Event* current = head;
+        Node* current = head;
         while (current) {
             if (current->name == name) {
                 cout << "\nEvent Found:\n";
@@ -195,7 +251,7 @@ public:
         cin.ignore();
         getline(cin, name);
         
-        Event* current = head;
+        Node* current = head;
         while (current && current->name != name) {
             current = current->next;
         }
@@ -225,12 +281,18 @@ public:
         // Remove from current position
         if (current == head) {
             head = head->next;
+            if (head == NULL) {
+                tail = NULL;
+            }
         } else {
-            Event* prev = head;
+            Node* prev = head;
             while (prev->next != current) {
                 prev = prev->next;
             }
             prev->next = current->next;
+            if (current == tail) {
+                tail = prev;
+            }
         }
         
         // Update details
@@ -238,18 +300,11 @@ public:
         current->note = newNote;
         current->next = nullptr;
         
-        // Reinsert in correct position
-        if (!head || newDate < head->date) {
-            current->next = head;
-            head = current;
-        } else {
-            Event* temp = head;
-            while (temp->next && temp->next->date < newDate) {
-                temp = temp->next;
-            }
-            current->next = temp->next;
-            temp->next = current;
-        }
+        // Reinsert in correct position using our helper function
+        insertInOrder(head, tail, current->name, newDate, newNote);
+        
+        // Delete the old node since insertInOrder creates a new one
+        delete current;
         
         cout << "Event updated successfully!\n";
     }
